@@ -86,7 +86,7 @@ dotnet tool install --global minver-cli
 Once that is installed, running the `minver` command will output a version:
 
 ```
-MinVer: Using { Commit: 2453a6d, Tag: '2.0.312', Version: 2.0.312, Height: 3 }.
+MinVer: Using { Commit: 2453a6d, Tag: '2.0.323', Version: 2.0.323, Height: 3 }.
 MinVer: Calculated version 2.0.313-alpha.0.3.
 2.0.313-alpha.0.3
 ```
@@ -100,7 +100,7 @@ nuget.exe Pack nuget.package/NativeBinaries.nuspec -Version <version> -NoPackage
 Where `<version>` is the version from the MinVer tool or manually chosen version.
 
 
-## Releasing
+## Releasing this Octopus fork
 
 Releases are triggered by pushing a git tag. The tag format is:
 
@@ -108,13 +108,13 @@ Releases are triggered by pushing a git tag. The tag format is:
 <upstream-version>-octopus.<n>
 ```
 
-Where `<upstream-version>` is the version from the upstream libgit2sharp.nativebinaries repo (e.g., `2.0.312`) and `<n>` is an incrementing number starting at 1. The incrementing number resets to 1 when the upstream version changes.
+Where `<upstream-version>` is the version from the upstream libgit2sharp.nativebinaries repo (e.g., `2.0.323`) and `<n>` is an incrementing number starting at 1. The incrementing number resets to 1 when the upstream version changes.
 
-For example, for upstream version `2.0.312`:
+For example, for upstream version `2.0.323`:
 
 ```
-git tag 2.0.312-octopus.1
-git push origin 2.0.312-octopus.1
+git tag 2.0.323-octopus.1
+git push origin 2.0.323-octopus.1
 ```
 
 This triggers CI, which builds all native binaries, packs the NuGet package with the tag as its version, and pushes it to the configured feed.

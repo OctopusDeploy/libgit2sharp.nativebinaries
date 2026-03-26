@@ -106,8 +106,9 @@ function Install-Libssh2($triplet) {
     if (-not (Test-Path $vcpkg)) {
         throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
     }
-    Write-Output "Installing libssh2 for $triplet via vcpkg..."
-    Run-Command -Fatal { & $vcpkg install "libssh2:$triplet" }
+    Write-Host "Installing libssh2 for $triplet via vcpkg..."
+    & $vcpkg install "libssh2:$triplet"
+    if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
     $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$triplet"
     $libssh2Dll = Join-Path $installedDir "bin\libssh2.dll"

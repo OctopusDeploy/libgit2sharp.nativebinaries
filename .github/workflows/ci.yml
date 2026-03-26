@@ -53,9 +53,6 @@ jobs:
       - name: Build Windows
         if: runner.os == 'Windows'
         run: ./build.libgit2.ps1 ${{ matrix.param }}
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
-        run: brew install libssh2
       - name: Build macOS
         if: runner.os == 'macOS'
         run: ./build.libgit2.sh

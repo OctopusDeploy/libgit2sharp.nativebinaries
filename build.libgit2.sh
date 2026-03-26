@@ -20,6 +20,13 @@ else
     USEHTTPS="OpenSSL-Dynamic"
 fi
 
+# Find static libssh2 for linking into the shared libgit2 library
+LIBSSH2_STATIC=$(find /usr -name "libssh2.a" 2>/dev/null | head -1)
+if [[ -z "$LIBSSH2_STATIC" ]]; then
+    echo "$(tput setaf 1)Error: static libssh2 (libssh2.a) not found. Install libssh2-dev (Debian) or libssh2-static (Alpine).$(tput sgr0)"
+    exit 1
+fi
+
 rm -rf libgit2/build
 mkdir libgit2/build
 pushd libgit2/build
@@ -29,6 +36,7 @@ export _BINPATH=`pwd`
 cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DBUILD_TESTS:BOOL=OFF \
       -DUSE_SSH=ON \
+      -DLIBSSH2_LIBRARY=$LIBSSH2_STATIC \
       -DLIBGIT2_FILENAME=git2-$SHORTSHA \
       -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
       -DUSE_HTTPS=$USEHTTPS \

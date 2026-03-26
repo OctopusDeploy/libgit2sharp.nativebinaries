@@ -101,6 +101,17 @@ function Assert-Consistent-Naming($expected, $path) {
     Ensure-Property $expected $dll.VersionInfo.OriginalFilename "VersionInfo.OriginalFilename" $dll.Fullname
 }
 
+function Install-Libssh2($triplet) {
+    $vcpkg = Join-Path $Env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
+    if (-not (Test-Path $vcpkg)) {
+        throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
+    }
+    Write-Output "Installing libssh2 for $triplet via vcpkg..."
+    Run-Command -Fatal { & $vcpkg install "libssh2:$triplet" }
+}
+
+$vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
+
 try {
     if ((!$x86.isPresent -and !$x64.IsPresent) -and !$arm64.IsPresent) {
         Write-Output -Stderr "Error: usage $MyInvocation.MyCommand [-x86] [-x64] [-arm64]"
@@ -117,8 +128,9 @@ try {
     cd build
 
     if ($x86.IsPresent) {
+        Install-Libssh2 "x86-windows-static"
         Write-Output "Building x86..."
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename"  .. }
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x86-windows-static" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -131,10 +143,11 @@ try {
     }
 
     if ($x64.IsPresent) {
+        Install-Libssh2 "x64-windows-static"
         Write-Output "Building x64..."
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x64-windows-static" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -146,10 +159,11 @@ try {
     }
 
     if ($arm64.IsPresent) {
+        Install-Libssh2 "arm64-windows-static"
         Write-Output "Building arm64..."
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=arm64-windows-static" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration

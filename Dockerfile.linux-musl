@@ -1,6 +1,6 @@
 FROM alpine:3.19
 
-RUN apk add --no-cache bash build-base cmake openssl-dev libssh2-dev libssh2-static openssl-libs-static
+RUN apk add --no-cache bash build-base cmake openssl-dev libssh2-dev patchelf
 
 WORKDIR /nativebinaries
 COPY . /nativebinaries/

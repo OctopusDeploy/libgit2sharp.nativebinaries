@@ -29,7 +29,7 @@ $x86Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-x86\nati
 $x64Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-x64\native"
 $arm64Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-arm64\native"
 $hashFile = Join-Path $projectDirectory "nuget.package\libgit2\libgit2_hash.txt"
-$sha = Get-Content $hashFile 
+$sha = Get-Content $hashFile
 $binaryFilename = "git2-" + $sha.Substring(0,7)
 
 $build_tests = 'OFF'
@@ -108,9 +108,22 @@ function Install-Libssh2($triplet) {
     }
     Write-Output "Installing libssh2 for $triplet via vcpkg..."
     Run-Command -Fatal { & $vcpkg install "libssh2:$triplet" }
-}
 
-$vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
+    $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$triplet"
+    $libssh2Dll = Join-Path $installedDir "bin\libssh2.dll"
+    $libssh2Lib = Join-Path $installedDir "lib\libssh2.lib"
+    $libssh2Include = Join-Path $installedDir "include"
+
+    if (-not (Test-Path $libssh2Dll)) {
+        throw "Error: libssh2.dll not found at $libssh2Dll"
+    }
+
+    return @{
+        Dll = $libssh2Dll
+        Library = $libssh2Lib
+        IncludeDir = $libssh2Include
+    }
+}
 
 try {
     if ((!$x86.isPresent -and !$x64.IsPresent) -and !$arm64.IsPresent) {
@@ -128,9 +141,10 @@ try {
     cd build
 
     if ($x86.IsPresent) {
-        Install-Libssh2 "x86-windows-static"
+        $ssh2 = Install-Libssh2 "x86-windows"
+        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x86..."
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x86-windows-static" .. }
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x86-windows" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -139,15 +153,18 @@ try {
         Run-Command -Quiet { & rm $x86Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x86Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x86Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $x86Directory }
+        Write-Output "Bundled libssh2.dll alongside libgit2"
         cd ..
     }
 
     if ($x64.IsPresent) {
-        Install-Libssh2 "x64-windows-static"
+        $ssh2 = Install-Libssh2 "x64-windows"
+        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x64..."
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x64-windows-static" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x64-windows" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -156,14 +173,17 @@ try {
         Run-Command -Quiet { & rm $x64Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x64Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $x64Directory }
+        Write-Output "Bundled libssh2.dll alongside libgit2"
     }
 
     if ($arm64.IsPresent) {
-        Install-Libssh2 "arm64-windows-static"
+        $ssh2 = Install-Libssh2 "arm64-windows"
+        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building arm64..."
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=arm64-windows-static" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=arm64-windows" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -172,6 +192,8 @@ try {
         Run-Command -Quiet { & rm $arm64Directory\* -ErrorAction Ignore  }
         Run-Command -Quiet { & mkdir -fo $arm64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $arm64Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $arm64Directory }
+        Write-Output "Bundled libssh2.dll alongside libgit2"
     }
 
     Write-Output "Done!"

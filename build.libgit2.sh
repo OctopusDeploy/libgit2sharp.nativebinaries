@@ -20,28 +20,15 @@ else
     USEHTTPS="OpenSSL-Dynamic"
 fi
 
-# Find static libssh2 for linking into the shared libgit2 library
-LIBSSH2_STATIC=$(find /usr /opt/homebrew 2>/dev/null -name "libssh2.a" 2>/dev/null | head -1)
-if [[ -z "$LIBSSH2_STATIC" ]]; then
-    echo "$(tput setaf 1)Error: static libssh2 (libssh2.a) not found. Install libssh2-dev (Debian), libssh2-static (Alpine), or libssh2 (Homebrew).$(tput sgr0)"
-    exit 1
-fi
-
 rm -rf libgit2/build
 mkdir libgit2/build
 pushd libgit2/build
 
 export _BINPATH=`pwd`
 
-LIBSSH2_INCLUDE_DIR=$(dirname "$LIBSSH2_STATIC")/../include
-
 cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DBUILD_TESTS:BOOL=OFF \
       -DUSE_SSH=ON \
-      -DLIBSSH2_FOUND:BOOL=TRUE \
-      -DLIBSSH2_LIBRARIES=$LIBSSH2_STATIC \
-      -DLIBSSH2_INCLUDE_DIRS=$LIBSSH2_INCLUDE_DIR \
-      -DLIBSSH2_LDFLAGS="-lssh2" \
       -DLIBGIT2_FILENAME=git2-$SHORTSHA \
       -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
       -DUSE_HTTPS=$USEHTTPS \
@@ -65,4 +52,28 @@ fi
 rm -rf $PACKAGEPATH/$RID
 mkdir -p $PACKAGEPATH/$RID/native
 
-cp libgit2/build/libgit2-$SHORTSHA.$LIBEXT $PACKAGEPATH/$RID/native
+LIBGIT2="libgit2/build/libgit2-$SHORTSHA.$LIBEXT"
+cp $LIBGIT2 $PACKAGEPATH/$RID/native
+
+# Find and bundle the shared libssh2 alongside libgit2
+if [[ $OS == "Darwin" ]]; then
+    LIBSSH2_PATH=$(otool -L $LIBGIT2 | grep libssh2 | awk '{print $1}')
+    if [[ -n "$LIBSSH2_PATH" ]]; then
+        cp $LIBSSH2_PATH $PACKAGEPATH/$RID/native/
+        LIBSSH2_NAME=$(basename $LIBSSH2_PATH)
+        # Rewrite libgit2 to find libssh2 in the same directory
+        install_name_tool -change $LIBSSH2_PATH @loader_path/$LIBSSH2_NAME $PACKAGEPATH/$RID/native/libgit2-$SHORTSHA.$LIBEXT
+        # Set libssh2's own id to be relative too
+        install_name_tool -id @loader_path/$LIBSSH2_NAME $PACKAGEPATH/$RID/native/$LIBSSH2_NAME
+        echo "Bundled $LIBSSH2_NAME alongside libgit2"
+    fi
+else
+    LIBSSH2_PATH=$(ldd $LIBGIT2 | grep libssh2 | awk '{print $3}')
+    if [[ -n "$LIBSSH2_PATH" ]]; then
+        cp $LIBSSH2_PATH $PACKAGEPATH/$RID/native/
+        LIBSSH2_NAME=$(basename $LIBSSH2_PATH)
+        # Set RPATH so libgit2 looks in its own directory
+        patchelf --set-rpath '$ORIGIN' $PACKAGEPATH/$RID/native/libgit2-$SHORTSHA.$LIBEXT
+        echo "Bundled $LIBSSH2_NAME alongside libgit2"
+    fi
+fi

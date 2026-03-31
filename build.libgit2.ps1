@@ -106,23 +106,34 @@ function Install-Libssh2($triplet) {
     if (-not (Test-Path $vcpkg)) {
         throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
     }
-    Write-Host "Installing libssh2 for $triplet via vcpkg..."
-    $null = & $vcpkg install "libssh2:$triplet"
+    # Use the static triplet so libssh2 (and its dependencies) are linked
+    # statically into git2-*.dll, eliminating the VCRUNTIME140.dll requirement.
+    $staticTriplet = "$triplet-static"
+    Write-Host "Installing libssh2 for $staticTriplet via vcpkg..."
+    $null = & $vcpkg install "libssh2:$staticTriplet"
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
-    $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$triplet"
-    $libssh2Dll = Join-Path $installedDir "bin\libssh2.dll"
+    $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$staticTriplet"
     $libssh2Lib = Join-Path $installedDir "lib\libssh2.lib"
     $libssh2Include = Join-Path $installedDir "include"
 
-    if (-not (Test-Path $libssh2Dll)) {
-        throw "Error: libssh2.dll not found at $libssh2Dll"
+    if (-not (Test-Path $libssh2Lib)) {
+        throw "Error: libssh2.lib not found at $libssh2Lib"
+    }
+
+    # Collect transitive static dependencies (e.g. OpenSSL if libssh2 was built
+    # with the openssl feature). FindLibSSH2.cmake only links what's in
+    # LIBSSH2_LIBRARY, so we pass everything as a semicolon-separated list.
+    $allLibs = @($libssh2Lib)
+    foreach ($dep in @("libcrypto.lib", "libssl.lib", "zlib.lib")) {
+        $depPath = Join-Path $installedDir "lib\$dep"
+        if (Test-Path $depPath) { $allLibs += $depPath }
     }
 
     return @{
-        Dll = $libssh2Dll
-        Library = $libssh2Lib
+        Library = $allLibs -join ";"
         IncludeDir = $libssh2Include
+        Triplet = $staticTriplet
     }
 }
 
@@ -145,7 +156,7 @@ try {
         $ssh2 = Install-Libssh2 "x86-windows"
         $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x86..."
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x86-windows" .. }
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -154,8 +165,7 @@ try {
         Run-Command -Quiet { & rm $x86Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x86Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x86Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $x86Directory }
-        Write-Output "Bundled libssh2.dll alongside libgit2"
+        Write-Output "libssh2 linked statically into $binaryFilename.dll"
         cd ..
     }
 
@@ -165,7 +175,7 @@ try {
         Write-Output "Building x64..."
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=x64-windows" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -174,8 +184,7 @@ try {
         Run-Command -Quiet { & rm $x64Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $x64Directory }
-        Write-Output "Bundled libssh2.dll alongside libgit2"
+        Write-Output "libssh2 linked statically into $binaryFilename.dll"
     }
 
     if ($arm64.IsPresent) {
@@ -184,7 +193,7 @@ try {
         Write-Output "Building arm64..."
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=arm64-windows" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -193,8 +202,7 @@ try {
         Run-Command -Quiet { & rm $arm64Directory\* -ErrorAction Ignore  }
         Run-Command -Quiet { & mkdir -fo $arm64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $arm64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo $($ssh2.Dll) $arm64Directory }
-        Write-Output "Bundled libssh2.dll alongside libgit2"
+        Write-Output "libssh2 linked statically into $binaryFilename.dll"
     }
 
     Write-Output "Done!"

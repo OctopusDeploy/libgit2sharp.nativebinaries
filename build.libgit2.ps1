@@ -69,19 +69,18 @@ function Run-Command([scriptblock]$Command, [switch]$Fatal, [switch]$Quiet) {
 
 function Find-CMake {
     # Look for cmake.exe in $Env:PATH.
-    $cmake = (Get-Command cmake.exe -ErrorAction SilentlyContinue)?.Definition
-    if (-not $cmake) {
-        # Look for the highest-versioned cmake.exe in its default location.
-        $cmake = @(Resolve-Path (Join-Path ${Env:ProgramFiles(x86)} "CMake *\bin\cmake.exe") -ErrorAction SilentlyContinue)[-1]?.Path
-    }
-    if (-not $cmake) {
-        # Look for cmake bundled with Visual Studio.
-        $cmake = @(Resolve-Path (Join-Path ${Env:ProgramFiles} "Microsoft Visual Studio\*\*\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe") -ErrorAction SilentlyContinue)[-1]?.Path
-    }
-    if (-not $cmake) {
-        throw "Error: Can't find cmake.exe"
-    }
-    $cmake
+    $cmd = Get-Command cmake.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Definition }
+
+    # Look for the highest-versioned cmake.exe in its default location.
+    $paths = @(Resolve-Path (Join-Path ${Env:ProgramFiles(x86)} "CMake *\bin\cmake.exe") -ErrorAction SilentlyContinue)
+    if ($paths) { return $paths[-1].Path }
+
+    # Look for cmake bundled with Visual Studio.
+    $paths = @(Resolve-Path (Join-Path ${Env:ProgramFiles} "Microsoft Visual Studio\*\*\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe") -ErrorAction SilentlyContinue)
+    if ($paths) { return $paths[-1].Path }
+
+    throw "Error: Can't find cmake.exe"
 }
 
 function Ensure-Property($expected, $propertyValue, $propertyName, $path) {

@@ -110,7 +110,8 @@ function Install-Libssh2($triplet) {
     # statically into git2-*.dll, eliminating the VCRUNTIME140.dll requirement.
     $staticTriplet = "$triplet-static"
     Write-Host "Installing libssh2 for $staticTriplet via vcpkg..."
-    $null = & $vcpkg install "libssh2:$staticTriplet"
+    # --recurse forces reinstall even if already present, ensuring WinCNG is used (not OpenSSL)
+    $null = & $vcpkg install "libssh2:$staticTriplet" --recurse
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
     $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$staticTriplet"
@@ -156,7 +157,7 @@ try {
         $ssh2 = Install-Libssh2 "x86-windows"
         $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x86..."
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D HAVE_LIBSSH2_MEMORY_CREDENTIALS=1 -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" .. }
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -175,7 +176,7 @@ try {
         Write-Output "Building x64..."
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D HAVE_LIBSSH2_MEMORY_CREDENTIALS=1 -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -193,7 +194,7 @@ try {
         Write-Output "Building arm64..."
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D HAVE_LIBSSH2_MEMORY_CREDENTIALS=1 -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration

@@ -108,9 +108,10 @@ function Install-Libssh2($triplet) {
     # Use the static triplet so libssh2 (and its dependencies) are linked
     # statically into git2-*.dll, eliminating the VCRUNTIME140.dll requirement.
     $staticTriplet = "$triplet-static"
-    Write-Host "Installing libssh2 for $staticTriplet via vcpkg..."
-    # --recurse forces reinstall even if already present, ensuring WinCNG is used (not OpenSSL)
-    $null = & $vcpkg install "libssh2:$staticTriplet" --recurse
+    Write-Host "Installing libssh2 (WinCNG) for $staticTriplet via vcpkg..."
+    # Remove first to ensure we get WinCNG (default), not a previously-installed OpenSSL build
+    $null = & $vcpkg remove "libssh2:$staticTriplet"
+    $null = & $vcpkg install "libssh2:$staticTriplet"
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
     $installedDir = Join-Path $vcpkgRoot "installed\$staticTriplet"

@@ -109,9 +109,9 @@ function Install-Libssh2($triplet) {
     # statically into git2-*.dll, eliminating the VCRUNTIME140.dll requirement.
     $staticTriplet = "$triplet-static"
     Write-Host "Installing libssh2 (WinCNG) for $staticTriplet via vcpkg..."
-    # Remove first to ensure we get WinCNG (default), not a previously-installed OpenSSL build
+    # Install with only zlib (no openssl feature) so WinCNG is used as the crypto backend
     $null = & $vcpkg remove "libssh2:$staticTriplet"
-    $null = & $vcpkg install "libssh2:$staticTriplet"
+    $null = & $vcpkg install "libssh2[zlib]:$staticTriplet"
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
     $installedDir = Join-Path $vcpkgRoot "installed\$staticTriplet"

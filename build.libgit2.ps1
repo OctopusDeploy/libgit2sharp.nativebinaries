@@ -100,9 +100,10 @@ function Assert-Consistent-Naming($expected, $path) {
 }
 
 function Install-Libssh2($triplet) {
-    $vcpkg = Join-Path $Env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
+    $vcpkgRoot = if ($Env:VCPKG_INSTALLATION_ROOT) { $Env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+    $vcpkg = Join-Path $vcpkgRoot "vcpkg.exe"
     if (-not (Test-Path $vcpkg)) {
-        throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
+        throw "Error: vcpkg not found at $vcpkgRoot"
     }
     # Use the static triplet so libssh2 (and its dependencies) are linked
     # statically into git2-*.dll, eliminating the VCRUNTIME140.dll requirement.
@@ -112,7 +113,7 @@ function Install-Libssh2($triplet) {
     $null = & $vcpkg install "libssh2:$staticTriplet" --recurse
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
-    $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$staticTriplet"
+    $installedDir = Join-Path $vcpkgRoot "installed\$staticTriplet"
     $libssh2Lib = Join-Path $installedDir "lib\libssh2.lib"
     $libssh2Include = Join-Path $installedDir "include"
 
@@ -133,6 +134,7 @@ function Install-Libssh2($triplet) {
         Library = $allLibs -join ";"
         IncludeDir = $libssh2Include
         Triplet = $staticTriplet
+        VcpkgRoot = $vcpkgRoot
     }
 }
 
@@ -153,7 +155,7 @@ try {
 
     if ($x86.IsPresent) {
         $ssh2 = Install-Libssh2 "x86-windows"
-        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
+        $vcpkgToolchain = Join-Path $ssh2.VcpkgRoot "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x86..."
         Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D HAVE_LIBCRYPT32=ON -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_TOOLCHAIN_FILE=$vcpkgToolchain" -D "VCPKG_TARGET_TRIPLET=$($ssh2.Triplet)" -D "LIBSSH2_LIBRARY=$($ssh2.Library)" -D "LIBSSH2_INCLUDE_DIR=$($ssh2.IncludeDir)" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
@@ -170,7 +172,7 @@ try {
 
     if ($x64.IsPresent) {
         $ssh2 = Install-Libssh2 "x64-windows"
-        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
+        $vcpkgToolchain = Join-Path $ssh2.VcpkgRoot "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building x64..."
         Run-Command -Quiet { & mkdir build64 }
         cd build64
@@ -188,7 +190,7 @@ try {
 
     if ($arm64.IsPresent) {
         $ssh2 = Install-Libssh2 "arm64-windows"
-        $vcpkgToolchain = Join-Path $Env:VCPKG_INSTALLATION_ROOT "scripts\buildsystems\vcpkg.cmake"
+        $vcpkgToolchain = Join-Path $ssh2.VcpkgRoot "scripts\buildsystems\vcpkg.cmake"
         Write-Output "Building arm64..."
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64

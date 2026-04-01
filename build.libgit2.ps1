@@ -113,7 +113,7 @@ function Install-Libssh2($triplet) {
     # so WinCNG is used as the crypto backend instead of OpenSSL.
     $overlayPorts = Join-Path $projectDirectory "vcpkg-overlays"
     & $vcpkg remove "libssh2:$staticTriplet" --recurse 2>&1 | Out-Null
-    & $vcpkg install "libssh2:$staticTriplet" "--overlay-ports=$overlayPorts"
+    & $vcpkg install "libssh2:$staticTriplet" "--overlay-ports=$overlayPorts" 2>&1 | Out-Null
     if ($LastExitCode -ne 0) { throw "vcpkg install failed" }
 
     $installedDir = Join-Path $vcpkgRoot "installed\$staticTriplet"

@@ -1,6 +1,5 @@
-ARG ARCH='amd64'
-FROM multiarch/alpine:${ARCH}-v3.13
-RUN apk add --no-cache bash build-base cmake
+FROM alpine:3.19
+RUN apk add --no-cache bash build-base cmake openssl-dev libssh2-dev patchelf
 
 WORKDIR /nativebinaries
 COPY . /nativebinaries/

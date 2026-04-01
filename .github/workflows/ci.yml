@@ -3,8 +3,8 @@ on:
   push:
     branches: [master, release-*]
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-*'
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-*"
   pull_request:
   workflow_dispatch:
 jobs:
@@ -16,13 +16,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-2019
+          - os: windows-2022
             name: win-x86
             param: -x86
-          - os: windows-2019
+          - os: windows-2022
             name: win-x64
             param: -x64
-          - os: windows-2019
+          - os: windows-2022
             name: win-arm64
             param: -arm64
           - os: ubuntu-24.04
@@ -55,9 +55,12 @@ jobs:
       - name: Build macOS
         if: runner.os == 'macOS'
         run: ./build.libgit2.sh
-      - name: Setup QEMU
-        if: matrix.name == 'linux-musl-arm' || matrix.name == 'linux-musl-arm64'
-        run: docker run --rm --privileged multiarch/qemu-user-static:register --reset
+      - name: Set up QEMU
+        if: matrix.name == 'linux-arm' || matrix.name == 'linux-arm64' || matrix.name == 'linux-ppc64le' || matrix.name == 'linux-musl-arm' || matrix.name == 'linux-musl-arm64'
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        if: runner.os == 'Linux'
+        uses: docker/setup-buildx-action@v3
       - name: Build Linux
         if: runner.os == 'Linux'
         run: ./dockerbuild.sh
@@ -67,12 +70,12 @@ jobs:
           name: ${{ matrix.name }}
           path: nuget.package/runtimes/${{ matrix.name }}
   package:
-     name: Create package
-     needs: build
-     runs-on: ubuntu-24.04
-     env:
-       DOTNET_NOLOGO: true
-     steps:
+    name: Create package
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      DOTNET_NOLOGO: true
+    steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
         with:
@@ -92,3 +95,9 @@ jobs:
         with:
           name: NuGet package
           path: ./nuget.package/*.nupkg
+      - name: Push package to feed
+        shell: bash
+        env:
+          FEED_API_KEY: ${{ secrets.FEED_API_KEY }}
+          FEED_SOURCE: ${{ secrets.FEED_SOURCE }}
+        run: dotnet nuget push ./nuget.package/*.nupkg --api-key "$FEED_API_KEY" --source "$FEED_SOURCE"

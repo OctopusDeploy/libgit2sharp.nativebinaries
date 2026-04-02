@@ -109,10 +109,39 @@ function Install-Libssh2($arch) {
         throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
     }
 
-    Write-Host "Installing libssh2 for $triplet via vcpkg..."
-    Run-Command -Fatal -Quiet { & $vcpkg install "libssh2:$triplet" }
+    # Install libssh2 with the WinCNG crypto backend (no OpenSSL dependency).
+    # 'openssl' is a default vcpkg feature for libssh2, so manifest mode is required
+    # to override it — classic mode has no --no-default-features flag.
+    # The overlay triplet injects -DENABLE_ECDSA_WINCNG=ON into every package's
+    # cmake configure step (zlib ignores it; libssh2 uses it).
+    $manifestDir = Join-Path $projectDirectory "libssh2-wincng-manifest"
+    New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
+    @"
+{
+  "name": "libssh2-wincng",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "libssh2",
+      "default-features": false,
+      "features": ["zlib"]
+    }
+  ]
+}
+"@ | Set-Content (Join-Path $manifestDir "vcpkg.json")
 
-    $installedDir = Join-Path $Env:VCPKG_INSTALLATION_ROOT "installed\$triplet"
+    $installRoot = Join-Path $projectDirectory "libssh2-wincng-installed"
+    $overlayTriplets = Join-Path $projectDirectory "libssh2-wincng-triplets"
+
+    Write-Host "Installing libssh2 (WinCNG + ECDSA) for $triplet via vcpkg..."
+    Push-Location $manifestDir
+    try {
+        Run-Command -Fatal -Quiet { & $vcpkg install --vcpkg-root $Env:VCPKG_INSTALLATION_ROOT --triplet $triplet "--x-install-root=$installRoot" "--overlay-triplets=$overlayTriplets" }
+    } finally {
+        Pop-Location
+    }
+
+    $installedDir = Join-Path $installRoot $triplet
 
     return @{
         IncludeDir = Join-Path $installedDir "include"

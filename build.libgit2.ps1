@@ -149,7 +149,7 @@ try {
         Run-Command -Quiet { & rm $x86Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x86Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x86Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "libssh2.dll") $x86Directory }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x86Directory }
         if (-not (Test-Path (Join-Path $x86Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x86Directory" }
         cd ..
     }
@@ -168,7 +168,7 @@ try {
         Run-Command -Quiet { & rm $x64Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "libssh2.dll") $x64Directory }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x64Directory }
         if (-not (Test-Path (Join-Path $x64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x64Directory" }
     }
 
@@ -186,7 +186,7 @@ try {
         Run-Command -Quiet { & rm $arm64Directory\* -ErrorAction Ignore  }
         Run-Command -Quiet { & mkdir -fo $arm64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $arm64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "libssh2.dll") $arm64Directory }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $arm64Directory }
         if (-not (Test-Path (Join-Path $arm64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $arm64Directory" }
     }
 

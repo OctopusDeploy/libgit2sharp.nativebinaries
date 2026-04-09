@@ -100,6 +100,26 @@ nuget.exe Pack nuget.package/NativeBinaries.nuspec -Version <version> -NoPackage
 Where `<version>` is the version from the MinVer tool or manually chosen version.
 
 
+## Releasing
+
+Releases are triggered by pushing a git tag. The tag format is:
+
+```
+<upstream-version>-octopus.<n>
+```
+
+Where `<upstream-version>` is the version from the upstream libgit2sharp.nativebinaries repo (e.g., `2.0.312`) and `<n>` is an incrementing number starting at 1. The incrementing number resets to 1 when the upstream version changes.
+
+For example, for upstream version `2.0.312`:
+
+```
+git tag 2.0.312-octopus.1
+git push origin 2.0.312-octopus.1
+```
+
+This triggers CI, which builds all native binaries, packs the NuGet package with the tag as its version, and pushes it to the configured feed.
+
+
 ## Notes on Visual Studio
 
 Visual Studio 2019 is required to build the Windows native binaries, however you

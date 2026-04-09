@@ -28,7 +28,7 @@ export _BINPATH=`pwd`
 
 cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DBUILD_TESTS:BOOL=OFF \
-      -DUSE_SSH=exec \
+      -DUSE_SSH=ON \
       -DLIBGIT2_FILENAME=git2-$SHORTSHA \
       -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
       -DUSE_HTTPS=$USEHTTPS \
@@ -53,3 +53,28 @@ rm -rf $PACKAGEPATH/$RID
 mkdir -p $PACKAGEPATH/$RID/native
 
 cp libgit2/build/libgit2-$SHORTSHA.$LIBEXT $PACKAGEPATH/$RID/native
+
+# Bundle libssh2 shared library alongside libgit2
+LIBGIT2_PATH="$PACKAGEPATH/$RID/native/libgit2-$SHORTSHA.$LIBEXT"
+
+if [[ $OS == "Darwin" ]]; then
+    echo "macOS: libssh2 sourced from global installation"
+else
+    # Linux: find libssh2 via ldd
+    LIBSSH2_PATH=$(ldd "$LIBGIT2_PATH" | grep libssh2 | awk '{print $3}')
+    if [[ -z "$LIBSSH2_PATH" ]]; then
+        echo "ERROR: libgit2 does not appear to link against libssh2"
+        exit 1
+    fi
+
+    LIBSSH2_BASENAME=$(basename "$LIBSSH2_PATH")
+
+    echo "Bundling $LIBSSH2_BASENAME from $LIBSSH2_PATH"
+    cp "$LIBSSH2_PATH" "$PACKAGEPATH/$RID/native/$LIBSSH2_BASENAME"
+
+    # Set RPATH so libgit2 finds libssh2 in the same directory at runtime
+    patchelf --set-rpath '$ORIGIN' "$LIBGIT2_PATH"
+fi
+
+echo "Contents of $PACKAGEPATH/$RID/native/:"
+ls -la "$PACKAGEPATH/$RID/native/"

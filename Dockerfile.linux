@@ -4,6 +4,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     pkg-config \
+    libssl-dev \
+    libssh2-1-dev \
+    patchelf \
     ca-certificates \
     git \
     && rm -rf /var/lib/apt/lists/*

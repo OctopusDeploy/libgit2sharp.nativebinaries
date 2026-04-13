@@ -1,11 +1,7 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    pkg-config \
-    ca-certificates \
-    git \
+    build-essential cmake pkg-config ca-certificates git libssl-dev libssh2-1-dev patchelf \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /nativebinaries

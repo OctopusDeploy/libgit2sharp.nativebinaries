@@ -20,6 +20,7 @@ if [[ $OS == "Darwin" ]]; then
     fi
 else
     USEHTTPS="OpenSSL-Dynamic"
+    EXTRA_CMAKE_FLAGS="-DCMAKE_BUILD_RPATH='\$ORIGIN'"
 fi
 
 rm -rf libgit2/build
@@ -74,10 +75,4 @@ else
 
     echo "Bundling $LIBSSH2_BASENAME from $LIBSSH2_PATH"
     cp "$LIBSSH2_PATH" "$PACKAGEPATH/$RID/native/$LIBSSH2_BASENAME"
-
-    # Set RPATH so libgit2 finds libssh2 in the same directory at runtime
-    patchelf --set-rpath '$ORIGIN' "$LIBGIT2_PATH"
 fi
-
-echo "Contents of $PACKAGEPATH/$RID/native/:"
-ls -la "$PACKAGEPATH/$RID/native/"

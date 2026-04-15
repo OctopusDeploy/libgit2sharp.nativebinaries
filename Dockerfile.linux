@@ -1,7 +1,12 @@
-FROM bording/crossbuild
-ARG ARCH='amd64'
-ENV CROSS_TRIPLE=${ARCH}
-RUN apt update && apt -y install pkg-config
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    ca-certificates \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /nativebinaries
 COPY . /nativebinaries/

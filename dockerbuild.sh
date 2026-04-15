@@ -3,14 +3,15 @@
 set -e
 echo "building for $RID"
 
+# Map RID to Docker platform for native builds (no cross-compilation).
 if [[ $RID =~ arm64 ]]; then
-    arch="arm64"
+    platform="linux/arm64"
 elif [[ $RID =~ arm ]]; then
-    arch="armhf"
+    platform="linux/arm/v7"
 elif [[ $RID =~ ppc64le ]]; then
-    arch="powerpc64le"
+    platform="linux/ppc64le"
 else
-    arch="amd64"
+    platform="linux/amd64"
 fi
 
 if [[ $RID == linux-musl* ]]; then
@@ -19,9 +20,9 @@ else
     dockerfile="Dockerfile.linux"
 fi
 
-docker buildx build -t $RID -f $dockerfile --build-arg ARCH=$arch .
+docker buildx build --platform "$platform" --load -t $RID -f $dockerfile .
 
-docker run -t -e RID=$RID --name=$RID $RID
+docker run --platform "$platform" -t -e RID=$RID --name=$RID $RID
 
 docker cp $RID:/nativebinaries/nuget.package/runtimes nuget.package
 

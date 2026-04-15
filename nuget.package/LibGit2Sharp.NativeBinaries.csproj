@@ -9,6 +9,7 @@
     <PackageLicenseFile>libgit2\libgit2.license.txt</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/libgit2/libgit2sharp.nativebinaries</PackageProjectUrl>
     <PackageIcon>libgit2\libgit2.png</PackageIcon>
+    <PackageId>Octopus.LibGit2Sharp.NativeBinaries</PackageId>
     <Description>Native binaries for LibGit2Sharp</Description>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageOutputPath>$(MSBuildThisFileDirectory)</PackageOutputPath>

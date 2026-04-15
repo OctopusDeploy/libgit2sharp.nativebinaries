@@ -109,3 +109,14 @@ jobs:
           FEED_API_KEY: ${{ secrets.FEED_API_KEY }}
           FEED_SOURCE: ${{ secrets.FEED_SOURCE }}
         run: dotnet nuget push ./nuget.package/*.nupkg --api-key "$FEED_API_KEY" --source "$FEED_SOURCE"
+  ci:
+    name: ci
+    needs: [build, package]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.package.result }}" != "success" ]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi

@@ -95,3 +95,14 @@ jobs:
         with:
           name: NuGet package
           path: ./nuget.package/*.nupkg
+  ci:
+    name: ci
+    needs: [build, package]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.package.result }}" != "success" ]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi

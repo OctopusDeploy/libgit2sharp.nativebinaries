@@ -29,7 +29,7 @@ $x86Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-x86\nati
 $x64Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-x64\native"
 $arm64Directory = Join-Path $projectDirectory "nuget.package\runtimes\win-arm64\native"
 $hashFile = Join-Path $projectDirectory "nuget.package\libgit2\libgit2_hash.txt"
-$sha = Get-Content $hashFile 
+$sha = Get-Content $hashFile
 $binaryFilename = "git2-" + $sha.Substring(0,7)
 
 $build_tests = 'OFF'
@@ -101,6 +101,56 @@ function Assert-Consistent-Naming($expected, $path) {
     Ensure-Property $expected $dll.VersionInfo.OriginalFilename "VersionInfo.OriginalFilename" $dll.Fullname
 }
 
+function Install-Libssh2($arch) {
+    $triplet = "$arch-windows"
+
+    $vcpkg = Join-Path $Env:VCPKG_INSTALLATION_ROOT "vcpkg.exe"
+    if (-not (Test-Path $vcpkg)) {
+        throw "Error: vcpkg not found at $Env:VCPKG_INSTALLATION_ROOT"
+    }
+
+    # Install libssh2 with the WinCNG crypto backend (no OpenSSL dependency).
+    # 'openssl' is a default vcpkg feature for libssh2, so manifest mode is required
+    # to override it — classic mode has no --no-default-features flag.
+    # The overlay triplet injects -DENABLE_ECDSA_WINCNG=ON into every package's
+    # cmake configure step (zlib ignores it; libssh2 uses it).
+    $manifestDir = Join-Path $projectDirectory "libssh2-wincng-manifest"
+    New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
+    @"
+{
+  "name": "libssh2-wincng",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "libssh2",
+      "default-features": false,
+      "features": ["zlib"]
+    }
+  ]
+}
+"@ | Set-Content (Join-Path $manifestDir "vcpkg.json")
+
+    $installRoot = Join-Path $projectDirectory "libssh2-wincng-installed"
+    $overlayTriplets = Join-Path $projectDirectory "libssh2-wincng-triplets"
+
+    Write-Host "Installing libssh2 (WinCNG + ECDSA) for $triplet via vcpkg..."
+    Push-Location $manifestDir
+    try {
+        Run-Command -Fatal -Quiet { & $vcpkg install --vcpkg-root $Env:VCPKG_INSTALLATION_ROOT --triplet $triplet "--x-install-root=$installRoot" "--overlay-triplets=$overlayTriplets" }
+    } finally {
+        Pop-Location
+    }
+
+    $installedDir = Join-Path $installRoot $triplet
+
+    return @{
+        IncludeDir = Join-Path $installedDir "include"
+        LibDir     = Join-Path $installedDir "lib"
+        BinDir     = Join-Path $installedDir "bin"
+        Prefix     = $installedDir
+    }
+}
+
 try {
     if ((!$x86.isPresent -and !$x64.IsPresent) -and !$arm64.IsPresent) {
         Write-Output -Stderr "Error: usage $MyInvocation.MyCommand [-x86] [-x64] [-arm64]"
@@ -118,7 +168,8 @@ try {
 
     if ($x86.IsPresent) {
         Write-Output "Building x86..."
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename"  .. }
+        $ssh2 = Install-Libssh2 "x86"
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" .. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -127,14 +178,17 @@ try {
         Run-Command -Quiet { & rm $x86Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x86Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x86Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x86Directory }
+        if (-not (Test-Path (Join-Path $x86Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x86Directory" }
         cd ..
     }
 
     if ($x64.IsPresent) {
         Write-Output "Building x64..."
+        $ssh2 = Install-Libssh2 "x64"
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -143,13 +197,16 @@ try {
         Run-Command -Quiet { & rm $x64Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x64Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x64Directory }
+        if (-not (Test-Path (Join-Path $x64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x64Directory" }
     }
 
     if ($arm64.IsPresent) {
         Write-Output "Building arm64..."
+        $ssh2 = Install-Libssh2 "arm64"
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=exec -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" ../.. }
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -158,6 +215,8 @@ try {
         Run-Command -Quiet { & rm $arm64Directory\* -ErrorAction Ignore  }
         Run-Command -Quiet { & mkdir -fo $arm64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $arm64Directory -Exclude *.lib }
+        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $arm64Directory }
+        if (-not (Test-Path (Join-Path $arm64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $arm64Directory" }
     }
 
     Write-Output "Done!"

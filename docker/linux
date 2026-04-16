@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     ca-certificates \
     git \
+    libssl-dev \
+    libssh2-1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /nativebinaries

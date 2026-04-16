@@ -8,3 +8,5 @@
 bin/
 obj/
 .vs/
+libssh2-wincng-manifest/
+libssh2-wincng-installed/

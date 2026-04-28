@@ -110,7 +110,7 @@ if [[ $OS == "Darwin" ]]; then
     # Ad-hoc re-sign — install_name_tool invalidates the existing signature, which is fatal on Apple Silicon.
     for DYLIB in "$NATIVE_DIR"/*.dylib; do
         codesign --force --sign - "$DYLIB"
-    done"
+    done
 else
     # Linux: find libssh2 via ldd
     LIBSSH2_PATH=$(ldd "$LIBGIT2_PATH" | grep libssh2 | awk '{print $3}')

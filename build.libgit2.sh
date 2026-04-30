@@ -100,11 +100,6 @@ if [[ $OS == "Darwin" ]]; then
     # Fallback rpaths so the binary still loads if a user has libssh2 elsewhere on their system.
     for DYLIB in "$NATIVE_DIR"/*.dylib; do
         install_name_tool -add_rpath @loader_path                  "$DYLIB"
-        # install_name_tool -add_rpath /opt/homebrew/lib             "$DYLIB"
-        # install_name_tool -add_rpath /opt/homebrew/opt/libssh2/lib "$DYLIB"
-        # install_name_tool -add_rpath /usr/local/lib                "$DYLIB"
-        # install_name_tool -add_rpath /usr/local/opt/libssh2/lib    "$DYLIB"
-        # install_name_tool -add_rpath /opt/local/lib                "$DYLIB"
     done
 
     # Ad-hoc re-sign — install_name_tool invalidates the existing signature, which is fatal on Apple Silicon.

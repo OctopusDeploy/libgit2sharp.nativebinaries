@@ -62,6 +62,8 @@ cp libgit2/build/libgit2-$SHORTSHA.$LIBEXT $PACKAGEPATH/$RID/native
 LIBGIT2_PATH="$PACKAGEPATH/$RID/native/libgit2-$SHORTSHA.$LIBEXT"
 
 if [[ $OS == "Darwin" ]]; then
+    # We don't run Octopus Server on Mac, so we can avoid the restriction of relying on the system crypto libraries
+    # (Required for FIPS compliance). Instead we just bundle the packages so devs don't need to install them.
     NATIVE_DIR="$PACKAGEPATH/$RID/native"
 
     is_homebrew_path() {
@@ -97,9 +99,8 @@ if [[ $OS == "Darwin" ]]; then
 
     bundle_homebrew_deps "$LIBGIT2_PATH"
 
-    # Fallback rpaths so the binary still loads if a user has libssh2 elsewhere on their system.
     for DYLIB in "$NATIVE_DIR"/*.dylib; do
-        install_name_tool -add_rpath @loader_path                  "$DYLIB"
+        install_name_tool -add_rpath @loader_path "$DYLIB"
     done
 
     # Ad-hoc re-sign — install_name_tool invalidates the existing signature, which is fatal on Apple Silicon.

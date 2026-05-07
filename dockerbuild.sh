@@ -40,6 +40,11 @@ mkdir -p nuget.package/runtimes/$RID/native
 if [[ $RID == linux-musl* ]]; then
     build_in_container "$RID" "Dockerfile.linux-musl" "" ""
     extract_runtimes "$RID"
+elif [[ $RID == linux-ppc64le ]]; then
+    # debian:bullseye-slim has no ppc64le manifest, so we skip the openssl1.1
+    # variant on this arch and ship only the default OpenSSL 3 build.
+    build_in_container "$RID" "Dockerfile.linux" "" ""
+    extract_runtimes "$RID"
 else
     # All glibc-based Linux RIDs get two variants:
     #   1. Default: built on bookworm against OpenSSL 3, libssh2 bundled as a separate .so

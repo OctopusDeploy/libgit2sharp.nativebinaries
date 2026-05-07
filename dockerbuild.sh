@@ -37,17 +37,16 @@ extract_runtimes() {
 rm -rf nuget.package/runtimes/$RID
 mkdir -p nuget.package/runtimes/$RID/native
 
-if [[ $RID == "linux-x64" ]]; then
-    build_in_container "linux-x64" "Dockerfile.linux" "" ""
-    extract_runtimes "linux-x64"
-
-    # Speicially build a static libssh2 variant for Linux x64 with OpenSSL 1.1 to
-    build_in_container "linux-x64-openssl1.1" "Dockerfile.linux-static-libssh2" "openssl1.1" "debian:bullseye-slim"
-    extract_runtimes "linux-x64-openssl1.1"
-elif [[ $RID == linux-musl* ]]; then
+if [[ $RID == linux-musl* ]]; then
     build_in_container "$RID" "Dockerfile.linux-musl" "" ""
     extract_runtimes "$RID"
 else
+    # All glibc-based Linux RIDs get two variants:
+    #   1. Default: built on bookworm against OpenSSL 3, libssh2 bundled as a separate .so
+    #   2. openssl1.1: built on bullseye against OpenSSL 1.1, libssh2 statically linked
     build_in_container "$RID" "Dockerfile.linux" "" ""
     extract_runtimes "$RID"
+
+    build_in_container "$RID-openssl1.1" "Dockerfile.linux-static-libssh2" "openssl1.1" "debian:bullseye-slim"
+    extract_runtimes "$RID-openssl1.1"
 fi

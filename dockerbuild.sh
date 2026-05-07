@@ -38,11 +38,11 @@ rm -rf nuget.package/runtimes/$RID
 mkdir -p nuget.package/runtimes/$RID/native
 
 if [[ $RID == "linux-x64" ]]; then
-    # Produce two libgit2 binaries for linux-x64: one statically linked against OpenSSL 3
-    # (bookworm) and one against OpenSSL 1.1 (bullseye).
-    build_in_container "linux-x64-openssl3" "Dockerfile.linux-static-libssh2" "openssl3" "debian:bookworm-slim"
+    build_in_container "linux-x64" "Dockerfile.linux" "" ""
+    extract_runtimes "linux-x64"
+
+    # Speicially build a static libssh2 variant for Linux x64 with OpenSSL 1.1 to
     build_in_container "linux-x64-openssl1.1" "Dockerfile.linux-static-libssh2" "openssl1.1" "debian:bullseye-slim"
-    extract_runtimes "linux-x64-openssl3"
     extract_runtimes "linux-x64-openssl1.1"
 elif [[ $RID == linux-musl* ]]; then
     build_in_container "$RID" "Dockerfile.linux-musl" "" ""

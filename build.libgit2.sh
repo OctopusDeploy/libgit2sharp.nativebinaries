@@ -68,7 +68,7 @@ if [[ $OS == "Darwin" ]]; then
 
     is_homebrew_path() {
         case "$1" in
-            /opt/homebrew/*|/usr/local/Cellar/*|/usr/local/opt/*) return 0 ;;
+            /opt/homebrew/*|/usr/local/Cellar/*) return 0 ;;
             *) return 1 ;;
         esac
     }

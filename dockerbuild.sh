@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-echo "building for $RID"
+echo "building for $RID variant=${VARIANT:-default}"
 
 # Map RID to Docker platform for native builds (no cross-compilation).
 if [[ $RID =~ arm64 ]]; then
@@ -40,18 +40,12 @@ mkdir -p nuget.package/runtimes/$RID/native
 if [[ $RID == linux-musl* ]]; then
     build_in_container "$RID" "Dockerfile.linux-musl" "" ""
     extract_runtimes "$RID"
-elif [[ $RID == linux-ppc64le ]]; then
-    # debian:bullseye-slim has no ppc64le manifest, so we skip the openssl1.1
-    # variant on this arch and ship only the default OpenSSL 3 build.
-    build_in_container "$RID" "Dockerfile.linux" "" ""
-    extract_runtimes "$RID"
-else
-    # All glibc-based Linux RIDs get two variants:
-    #   1. Default: built on bookworm against OpenSSL 3, libssh2 bundled as a separate .so
-    #   2. openssl1.1: built on bullseye against OpenSSL 1.1, libssh2 statically linked
-    build_in_container "$RID" "Dockerfile.linux" "" ""
-    extract_runtimes "$RID"
-
+elif [[ "$VARIANT" == "openssl1.1" ]]; then
+    # Built on bullseye against OpenSSL 1.1, libssh2 statically linked.
     build_in_container "$RID-openssl1.1" "Dockerfile.linux-static-libssh2" "openssl1.1" "debian:bullseye-slim"
     extract_runtimes "$RID-openssl1.1"
+else
+    # Default: built on bookworm against OpenSSL 3, libssh2 bundled as a separate .so.
+    build_in_container "$RID" "Dockerfile.linux" "" ""
+    extract_runtimes "$RID"
 fi

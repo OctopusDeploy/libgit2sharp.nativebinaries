@@ -88,15 +88,17 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         id: version
         run: |
-          # Base version = latest release tag (MAJOR.MINOR.PATCH) with patch bumped
-          LATEST=$(git tag --list --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
-          PATCH=${LATEST##*.}
-          MAJOR_MINOR=${LATEST%.*}
-          BASE="${MAJOR_MINOR}.$((PATCH + 1))"
+          # Latest release tag matching the convention <upstream-version>-octopus.<n> (see README "Releasing")
+          LATEST=$(git tag --list --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-octopus\.[0-9]+$' | head -n 1)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No release tag matching <upstream-version>-octopus.<n> found"
+            exit 1
+          fi
           # Sanitize branch name: lowercase, replace non-alphanumeric with hyphen, trim to 20 chars
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           SAFE_BRANCH=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-20)
-          echo "override=${BASE}-${SAFE_BRANCH}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # Join with '.' (not '-') so branch/run land as separate prerelease IDs, keeping ordering correct vs the next octopus.<n+1>
+          echo "override=${LATEST}.${SAFE_BRANCH}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - name: Download artifacts
         uses: actions/download-artifact@v8.0.1
         with:

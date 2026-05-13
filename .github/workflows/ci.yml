@@ -133,13 +133,19 @@ jobs:
       - name: Merge variant artifacts into RID directories
         shell: bash
         run: |
+          # Variant artifacts (e.g. "linux-x64-openssl1.1") need their native
+          # binaries merged into the base RID directory ("linux-x64") so the
+          # NuGet package contains a single runtimes/<rid>/native/ tree per RID.
           cd nuget.package/runtimes
-          for d in *-openssl1.1; do
-            [[ -d "$d" ]] || continue
-            rid="${d%-openssl1.1}"
-            mkdir -p "$rid/native"
-            mv "$d/native/"* "$rid/native/"
-            rm -rf "$d"
+          for variant_dir in *-openssl1.1; do
+            [[ -d "$variant_dir" ]] || continue
+
+            rid="${variant_dir%-openssl1.1}"
+            target="$rid/native"
+
+            mkdir -p "$target"
+            mv "$variant_dir/native/"* "$target/"
+            rm -rf "$variant_dir"
           done
       - name: Create package
         run: dotnet pack nuget.package ${{ steps.version.outputs.override && format('/p:MinVerVersionOverride={0}', steps.version.outputs.override) || '' }}

@@ -1,0 +1,33 @@
+FROM debian:bullseye-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    ca-certificates \
+    curl \
+    git \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build libssh2 from source as a PIC static archive. apt's libssh2.a is not
+# compiled with -fPIC, which prevents linking into libgit2.so. Static linking
+# lets us ship one libgit2-<sha>-<openssl-variant>.so per OpenSSL ABI without
+# colliding libssh2.so.1 SONAMEs across variants.
+ARG LIBSSH2_VERSION=1.11.1
+RUN curl -fsSL https://github.com/libssh2/libssh2/releases/download/libssh2-${LIBSSH2_VERSION}/libssh2-${LIBSSH2_VERSION}.tar.gz -o libssh2.tar.gz \
+ && tar xf libssh2.tar.gz \
+ && cmake -S libssh2-${LIBSSH2_VERSION} -B libssh2-${LIBSSH2_VERSION}/build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DCRYPTO_BACKEND=OpenSSL \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_EXAMPLES=OFF \
+ && cmake --build libssh2-${LIBSSH2_VERSION}/build --target install \
+ && rm -rf libssh2-${LIBSSH2_VERSION} libssh2.tar.gz
+
+WORKDIR /nativebinaries
+COPY . /nativebinaries/
+
+CMD ["/bin/bash", "-c", "./build.libgit2.sh"]

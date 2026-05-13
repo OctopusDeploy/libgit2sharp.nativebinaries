@@ -11,6 +11,14 @@ OSXARCHITECTURE=$ARCH
 
 EXTRA_CMAKE_FLAGS=""
 
+# When OPENSSL_VARIANT is set, append it to the libgit2 filename so multiple
+# variants can ship side by side and be selected at runtime
+# This is only needed to support multiple versions of OpenSSL on Linux
+LIBGIT2_FILENAME="git2-$SHORTSHA"
+if [[ -n "$OPENSSL_VARIANT" ]]; then
+    LIBGIT2_FILENAME="$LIBGIT2_FILENAME-$OPENSSL_VARIANT"
+fi
+
 if [[ $OS == "Darwin" ]]; then
     USEHTTPS="ON"
     if [[ $RID == "osx-arm64" ]]; then
@@ -32,7 +40,7 @@ export _BINPATH=`pwd`
 cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DBUILD_TESTS:BOOL=OFF \
       -DUSE_SSH=ON \
-      -DLIBGIT2_FILENAME=git2-$SHORTSHA \
+      -DLIBGIT2_FILENAME=$LIBGIT2_FILENAME \
       -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
       -DUSE_HTTPS=$USEHTTPS \
       -DUSE_BUNDLED_ZLIB=ON \
@@ -56,10 +64,7 @@ fi
 rm -rf $PACKAGEPATH/$RID
 mkdir -p $PACKAGEPATH/$RID/native
 
-cp libgit2/build/libgit2-$SHORTSHA.$LIBEXT $PACKAGEPATH/$RID/native
-
-# Bundle libssh2 shared library alongside libgit2
-LIBGIT2_PATH="$PACKAGEPATH/$RID/native/libgit2-$SHORTSHA.$LIBEXT"
+cp libgit2/build/lib$LIBGIT2_FILENAME.$LIBEXT $PACKAGEPATH/$RID/native
 
 if [[ $OS == "Darwin" ]]; then
     # We don't run Octopus Server on Mac, so we can avoid the restriction of relying on the system crypto libraries
@@ -107,8 +112,11 @@ if [[ $OS == "Darwin" ]]; then
     for DYLIB in "$NATIVE_DIR"/*.dylib; do
         codesign --force --sign - "$DYLIB"
     done
+elif [[ -n "$OPENSSL_VARIANT" ]]; then
+    echo "$OPENSSL_VARIANT: libssh2 statically linked into libgit2"
 else
-    # Linux: find libssh2 via ldd
+    # Linux: bundle the dynamic libssh2 alongside libgit2.
+    LIBGIT2_PATH="$PACKAGEPATH/$RID/native/lib$LIBGIT2_FILENAME.$LIBEXT"
     LIBSSH2_PATH=$(ldd "$LIBGIT2_PATH" | grep libssh2 | awk '{print $3}')
     if [[ -z "$LIBSSH2_PATH" ]]; then
         echo "ERROR: libgit2 does not appear to link against libssh2"

@@ -91,6 +91,9 @@ jobs:
       - name: Build Linux
         if: runner.os == 'Linux'
         run: ./dockerbuild.sh
+      - name: Verify build output
+        shell: bash
+        run: ./verify-build.sh "${{ matrix.rid }}" "${{ matrix.variant }}"
       - name: Upload artifacts
         uses: actions/upload-artifact@v7.0.0
         with:

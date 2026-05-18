@@ -109,7 +109,7 @@ case "$RID" in
         ;;
 
     win-*)
-        require_file "$NATIVE_DIR/$LIBGIT2_BASENAME.dll"
+        require_file "$NATIVE_DIR/git2-$SHORTSHA.dll"
         require_file "$NATIVE_DIR/libssh2.dll"
         ;;
 

@@ -66,6 +66,8 @@ mkdir -p $PACKAGEPATH/$RID/native
 
 cp libgit2/build/lib$LIBGIT2_FILENAME.$LIBEXT $PACKAGEPATH/$RID/native
 
+LIBGIT2_PATH="$PACKAGEPATH/$RID/native/lib$LIBGIT2_FILENAME.$LIBEXT"
+
 if [[ $OS == "Darwin" ]]; then
     # We don't run Octopus Server on Mac, so we can avoid the restriction of relying on the system crypto libraries
     # (Required for FIPS compliance). Instead we just bundle the packages so devs don't need to install them.
@@ -73,7 +75,7 @@ if [[ $OS == "Darwin" ]]; then
 
     is_homebrew_path() {
         case "$1" in
-            /opt/homebrew/*|/usr/local/Cellar/*) return 0 ;;
+            /opt/homebrew/*|/usr/local/Cellar/*|/usr/local/opt/*) return 0 ;;
             *) return 1 ;;
         esac
     }

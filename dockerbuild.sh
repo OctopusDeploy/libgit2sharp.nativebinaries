@@ -3,6 +3,8 @@
 set -e
 echo "building for $RID variant=${VARIANT:-default}"
 
+LIBSSH2_VERSION="${LIBSSH2_VERSION:-1.11.1}"
+
 # Map RID to Docker platform for native builds (no cross-compilation).
 if [[ $RID =~ arm64 ]]; then
     platform="linux/arm64"
@@ -25,7 +27,7 @@ else
     dockerfile="Dockerfile.linux"
 fi
 
-docker buildx build --platform "$platform" --load -t "$RID" -f "$dockerfile" .
+docker buildx build --platform "$platform" --load -t "$RID" -f "$dockerfile" --build-arg LIBSSH2_VERSION="$LIBSSH2_VERSION" .
 docker run --platform "$platform" -t -e RID=$RID -e OPENSSL_VARIANT="$VARIANT" --name="$RID" "$RID"
 docker cp "$RID":/nativebinaries/nuget.package/runtimes nuget.package
 docker rm "$RID"

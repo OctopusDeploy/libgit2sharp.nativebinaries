@@ -1,6 +1,18 @@
 FROM alpine:3.19
 
-RUN apk add --no-cache bash build-base cmake openssl-dev libssh2-dev
+RUN apk add --no-cache bash build-base cmake curl openssl-dev
+
+ARG LIBSSH2_VERSION=1.11.1
+RUN curl -fsSL https://github.com/libssh2/libssh2/releases/download/libssh2-${LIBSSH2_VERSION}/libssh2-${LIBSSH2_VERSION}.tar.gz -o libssh2.tar.gz \
+ && tar xf libssh2.tar.gz \
+ && cmake -S libssh2-${LIBSSH2_VERSION} -B libssh2-${LIBSSH2_VERSION}/build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCRYPTO_BACKEND=OpenSSL \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_EXAMPLES=OFF \
+ && cmake --build libssh2-${LIBSSH2_VERSION}/build --target install \
+ && rm -rf libssh2-${LIBSSH2_VERSION} libssh2.tar.gz
 
 WORKDIR /nativebinaries
 COPY . /nativebinaries/

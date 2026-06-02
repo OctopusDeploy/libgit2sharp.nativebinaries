@@ -26,6 +26,8 @@ fi
 
 NATIVE_DIR="$PACKAGEPATH/$RID/native"
 
+EXPECTED_LIBSSH2_VERSION="${LIBSSH2_VERSION:-1.11.1}"
+
 failures=0
 fail() {
     echo "FAIL: $*" >&2
@@ -43,6 +45,16 @@ require_file() {
     fi
 }
 
+assert_libssh2_version() {
+    local file="$1"
+    [[ -f "$file" ]] || return
+    if grep -aFq "libssh2_${EXPECTED_LIBSSH2_VERSION}" "$file"; then
+        pass "$(basename "$file"): libssh2 $EXPECTED_LIBSSH2_VERSION banner present"
+    else
+        fail "$(basename "$file"): libssh2 $EXPECTED_LIBSSH2_VERSION banner not found (version not pinned?)"
+    fi
+}
+
 echo "Verifying $NATIVE_DIR (rid=$RID, variant=${VARIANT:-none})"
 
 case "$RID" in
@@ -50,6 +62,7 @@ case "$RID" in
         LIBGIT2_FILE="$NATIVE_DIR/$LIBGIT2_BASENAME.dylib"
         require_file "$LIBGIT2_FILE"
         require_file "$NATIVE_DIR/libssh2.1.dylib"
+        assert_libssh2_version "$NATIVE_DIR/libssh2.1.dylib"
 
         # No dylib in the bundle should retain an absolute Homebrew path; every
         # such reference should have been rewritten to @rpath/<basename> by the
@@ -91,6 +104,8 @@ case "$RID" in
                 else
                     pass "$LIBGIT2_FILE: libssh2 not in NEEDED (statically linked)"
                 fi
+                # libssh2 is statically linked into libgit2, so the banner lives there.
+                assert_libssh2_version "$LIBGIT2_FILE"
             else
                 # Default builds dynamically bundle libssh2 alongside libgit2 via ldd.
                 if echo "$NEEDED" | grep -q '^libssh2'; then
@@ -101,6 +116,7 @@ case "$RID" in
                 LIBSSH2_BUNDLED=$(find "$NATIVE_DIR" -maxdepth 1 -name 'libssh2.so*' -print -quit)
                 if [[ -n "$LIBSSH2_BUNDLED" ]]; then
                     pass "$(basename "$LIBSSH2_BUNDLED") bundled alongside libgit2"
+                    assert_libssh2_version "$LIBSSH2_BUNDLED"
                 else
                     fail "no libssh2.so* found in $NATIVE_DIR — default build should bundle it"
                 fi
@@ -111,6 +127,7 @@ case "$RID" in
     win-*)
         require_file "$NATIVE_DIR/git2-$SHORTSHA.dll"
         require_file "$NATIVE_DIR/libssh2.dll"
+        assert_libssh2_version "$NATIVE_DIR/libssh2.dll"
         ;;
 
     *)

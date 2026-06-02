@@ -26,6 +26,27 @@ if [[ $OS == "Darwin" ]]; then
     elif [[ $RID == "osx-x64" ]]; then
         OSXARCHITECTURE="x86_64"
     fi
+
+    LIBSSH2_VERSION="${LIBSSH2_VERSION:-1.11.1}"
+    LIBSSH2_PREFIX="$(pwd)/libssh2-install"
+    rm -rf "$LIBSSH2_PREFIX" libssh2-src libssh2.tar.gz
+    curl -fsSL "https://github.com/libssh2/libssh2/releases/download/libssh2-${LIBSSH2_VERSION}/libssh2-${LIBSSH2_VERSION}.tar.gz" -o libssh2.tar.gz
+    mkdir libssh2-src
+    tar xf libssh2.tar.gz -C libssh2-src --strip-components=1
+    cmake -S libssh2-src -B libssh2-src/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DCRYPTO_BACKEND=OpenSSL \
+        -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)" \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
+        -DCMAKE_INSTALL_PREFIX="$LIBSSH2_PREFIX"
+    cmake --build libssh2-src/build --target install
+    rm -rf libssh2-src libssh2.tar.gz
+
+    # Make libgit2's configure discover our build instead of the Homebrew copy.
+    EXTRA_CMAKE_FLAGS="-DCMAKE_PREFIX_PATH=$LIBSSH2_PREFIX"
 else
     USEHTTPS="OpenSSL-Dynamic"
     EXTRA_CMAKE_FLAGS="-DCMAKE_BUILD_RPATH='\$ORIGIN'"
@@ -103,6 +124,20 @@ if [[ $OS == "Darwin" ]]; then
             fi
         done
     }
+
+    # libgit2 links our source-built libssh2, which lives outside Homebrew so the
+    # walker above won't pick it up.
+    SSH2_REF=$(otool -L "$LIBGIT2_PATH" | awk '/libssh2/ {print $1; exit}')
+    if [[ -z "$SSH2_REF" ]]; then
+        echo "ERROR: libgit2 does not appear to link against libssh2"
+        exit 1
+    fi
+    SSH2_BASENAME=$(basename "$SSH2_REF")
+    cp "$LIBSSH2_PREFIX/lib/$SSH2_BASENAME" "$NATIVE_DIR/$SSH2_BASENAME"
+    chmod u+w "$NATIVE_DIR/$SSH2_BASENAME"
+    install_name_tool -id "@rpath/$SSH2_BASENAME" "$NATIVE_DIR/$SSH2_BASENAME"
+    install_name_tool -change "$SSH2_REF" "@rpath/$SSH2_BASENAME" "$LIBGIT2_PATH"
+    bundle_homebrew_deps "$NATIVE_DIR/$SSH2_BASENAME"
 
     bundle_homebrew_deps "$LIBGIT2_PATH"
 

@@ -99,6 +99,35 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: nuget.package/runtimes/${{ matrix.rid }}
+  smoke-windows:
+    name: smoke-win-x64
+    needs: build
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+      - name: Download win-x64 artifact
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: win-x64
+          path: smoke-test/windows
+      - name: Compute libgit2 DLL name
+        id: dll
+        shell: bash
+        run: |
+          SHA=$(cat nuget.package/libgit2/libgit2_hash.txt)
+          echo "name=git2-${SHA:0:7}.dll" >> "$GITHUB_OUTPUT"
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Build static-CRT loader
+        shell: cmd
+        run: cl /MT /O2 smoke-test\windows\loader.c /Fe:smoke-test\windows\loader.exe
+      - name: Build bare-Windows smoke image
+        run: docker build -t libgit2-smoke -f smoke-test/windows/Dockerfile smoke-test/windows
+      - name: Load git2 on bare Windows (no VC++ redist)
+        run: docker run --rm libgit2-smoke C:\native\${{ steps.dll.outputs.name }}
   package:
     name: Create package
     needs: build
@@ -165,12 +194,12 @@ jobs:
         run: dotnet nuget push ./nuget.package/*.nupkg --api-key "$FEED_API_KEY" --source "$FEED_SOURCE"
   ci:
     name: ci
-    needs: [build, package]
+    needs: [build, package, smoke-windows]
     runs-on: ubuntu-24.04
     steps:
       - name: Check results
         run: |
-          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.package.result }}" != "success" ]; then
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.package.result }}" != "success" ] || [ "${{ needs.smoke-windows.result }}" != "success" ]; then
             echo "One or more jobs failed"
             exit 1
           fi

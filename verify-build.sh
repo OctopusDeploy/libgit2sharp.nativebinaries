@@ -110,7 +110,13 @@ case "$RID" in
 
     win-*)
         require_file "$NATIVE_DIR/git2-$SHORTSHA.dll"
-        require_file "$NATIVE_DIR/libssh2.dll"
+        # libssh2 is statically linked into git2-*.dll, so no separate libssh2.dll
+        # should ship alongside it.
+        if [[ -f "$NATIVE_DIR/libssh2.dll" ]]; then
+            fail "libssh2.dll present in $NATIVE_DIR — expected static linkage into git2-$SHORTSHA.dll"
+        else
+            pass "no separate libssh2.dll (statically linked)"
+        fi
         ;;
 
     *)

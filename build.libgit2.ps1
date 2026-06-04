@@ -101,6 +101,25 @@ function Assert-Consistent-Naming($expected, $path) {
     Ensure-Property $expected $dll.VersionInfo.OriginalFilename "VersionInfo.OriginalFilename" $dll.Fullname
 }
 
+function Assert-MemoryCredentials {
+    # After cmake configure, libgit2 generates git2_features.h from
+    # src/util/git2_features.h.in. The #cmakedefine becomes either
+    #   #define GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS 1   (probe passed)
+    # or
+    #   /* #undef GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS */ (probe failed -> feature compiled out)
+    # A failed probe means the check_library_exists() test executable couldn't
+    # link the static libssh2 + transitive deps, silently disabling in-memory
+    # SSH key auth. Fail loudly instead.
+    $featuresFile = Get-ChildItem -Path . -Recurse -Filter git2_features.h -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $featuresFile) {
+        throw "Assert-MemoryCredentials: git2_features.h not found after configure"
+    }
+    if (-not (Select-String -Path $featuresFile.FullName -Pattern 'define GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS' -Quiet)) {
+        throw "GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS not defined in $($featuresFile.FullName) - in-memory SSH credentials were silently disabled (static transitive deps not visible to the check_library_exists probe)"
+    }
+    Write-Host "Verified GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS is defined ($($featuresFile.FullName))"
+}
+
 function Install-Libssh2($arch) {
     $triplet = "$arch-windows"
 
@@ -169,7 +188,8 @@ try {
     if ($x86.IsPresent) {
         Write-Output "Building x86..."
         $ssh2 = Install-Libssh2 "x86"
-        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" .. }
+        Run-Command -Fatal { & $cmake -A Win32 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" -D "CMAKE_SHARED_LINKER_FLAGS=bcrypt.lib crypt32.lib" -D "CMAKE_REQUIRED_LIBRARIES=bcrypt;crypt32" .. }
+        Assert-MemoryCredentials
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -178,8 +198,6 @@ try {
         Run-Command -Quiet { & rm $x86Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x86Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x86Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x86Directory }
-        if (-not (Test-Path (Join-Path $x86Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x86Directory" }
         cd ..
     }
 
@@ -188,7 +206,8 @@ try {
         $ssh2 = Install-Libssh2 "x64"
         Run-Command -Quiet { & mkdir build64 }
         cd build64
-        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" ../.. }
+        Run-Command -Fatal { & $cmake -A x64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" -D "CMAKE_SHARED_LINKER_FLAGS=bcrypt.lib crypt32.lib" -D "CMAKE_REQUIRED_LIBRARIES=bcrypt;crypt32" ../.. }
+        Assert-MemoryCredentials
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -197,8 +216,6 @@ try {
         Run-Command -Quiet { & rm $x64Directory\* -ErrorAction Ignore }
         Run-Command -Quiet { & mkdir -fo $x64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $x64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $x64Directory }
-        if (-not (Test-Path (Join-Path $x64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $x64Directory" }
     }
 
     if ($arm64.IsPresent) {
@@ -206,7 +223,8 @@ try {
         $ssh2 = Install-Libssh2 "arm64"
         Run-Command -Quiet { & mkdir buildarm64 }
         cd buildarm64
-        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" ../.. }
+        Run-Command -Fatal { & $cmake -A ARM64 -D USE_SSH=ON -D USE_HTTPS=Schannel -D "BUILD_TESTS=$build_tests" -D "BUILD_CLI=OFF" -D "LIBGIT2_FILENAME=$binaryFilename" -D "CMAKE_PREFIX_PATH=$($ssh2.Prefix)" -D "CMAKE_SHARED_LINKER_FLAGS=bcrypt.lib crypt32.lib" -D "CMAKE_REQUIRED_LIBRARIES=bcrypt;crypt32" ../.. }
+        Assert-MemoryCredentials
         Run-Command -Fatal { & $cmake --build . --config $configuration }
         if ($test.IsPresent) { Run-Command -Quiet -Fatal { & $ctest -V . } }
         cd $configuration
@@ -215,8 +233,6 @@ try {
         Run-Command -Quiet { & rm $arm64Directory\* -ErrorAction Ignore  }
         Run-Command -Quiet { & mkdir -fo $arm64Directory }
         Run-Command -Quiet -Fatal { & copy -fo * $arm64Directory -Exclude *.lib }
-        Run-Command -Quiet -Fatal { & copy -fo (Join-Path $ssh2.BinDir "*.dll") $arm64Directory }
-        if (-not (Test-Path (Join-Path $arm64Directory "libssh2.dll"))) { throw "Error: libssh2.dll was not copied to $arm64Directory" }
     }
 
     Write-Output "Done!"

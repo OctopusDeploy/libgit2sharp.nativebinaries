@@ -101,16 +101,10 @@ function Assert-Consistent-Naming($expected, $path) {
     Ensure-Property $expected $dll.VersionInfo.OriginalFilename "VersionInfo.OriginalFilename" $dll.Fullname
 }
 
+# libssh2_userauth_publickey_frommemory is quite fragile and can easily be left out by a misconfigured build or
+# a changed dependency. This assertion tries to verify that we have the GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS
+# feature enabled and blows up the build if not.
 function Assert-MemoryCredentials {
-    # libgit2's SelectSSH uses a check_library_exists() probe to set
-    # GIT_SSH_LIBSSH2_MEMORY_CREDENTIALS. That probe is unreliable against our
-    # static-CRT vcpkg libssh2 (the VS-generator try_compile defaults to a Debug
-    # /MTd link against the Release /MT libs and can't resolve it), so we pre-set
-    # HAVE_LIBSSH2_MEMORY_CREDENTIALS=1 on the cmake command line to skip it.
-    # libssh2_userauth_publickey_frommemory is part of libssh2's public API, and
-    # its real presence is enforced by the final git2-*.dll link (a missing symbol
-    # fails loudly there with LNK2019). This assertion guards against the force
-    # flag silently no-op'ing (e.g. a renamed cache var in a future libgit2).
     $featuresFile = Get-ChildItem -Path . -Recurse -Filter git2_features.h -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $featuresFile) {
         throw "Assert-MemoryCredentials: git2_features.h not found after configure"

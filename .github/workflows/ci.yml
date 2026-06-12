@@ -8,7 +8,7 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  build:
+  build-windows:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     env:
@@ -32,6 +32,64 @@ jobs:
             name: win-arm64
             rid: win-arm64
             param: -arm64
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          submodules: true
+      - name: Build Windows
+        run: ./build.libgit2.ps1 ${{ matrix.param }}
+      - name: Verify build output
+        shell: bash
+        run: ./verify-build.sh "${{ matrix.rid }}" "${{ matrix.variant }}"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: ${{ matrix.name }}
+          path: nuget.package/runtimes/${{ matrix.rid }}
+
+  build-mac:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    env:
+      RID: ${{ matrix.rid }}
+      VARIANT: ${{ matrix.variant }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-26-intel
+            name: osx-x64
+            rid: osx-x64
+          - os: macos-26
+            name: osx-arm64
+            rid: osx-arm64
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          submodules: true
+      - name: Build macOS
+        run: ./build.libgit2.sh
+      - name: Verify build output
+        shell: bash
+        run: ./verify-build.sh "${{ matrix.rid }}" "${{ matrix.variant }}"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: ${{ matrix.name }}
+          path: nuget.package/runtimes/${{ matrix.rid }}
+
+  build-linux:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    env:
+      RID: ${{ matrix.rid }}
+      VARIANT: ${{ matrix.variant }}
+    strategy:
+      matrix:
+        include:
           - os: ubuntu-24.04
             name: linux-x64
             rid: linux-x64
@@ -67,32 +125,18 @@ jobs:
           - os: ubuntu-24.04
             name: linux-musl-arm64
             rid: linux-musl-arm64
-          - os: macos-26-intel
-            name: osx-x64
-            rid: osx-x64
-          - os: macos-26
-            name: osx-arm64
-            rid: osx-arm64
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
         with:
           submodules: true
-      - name: Build Windows
-        if: runner.os == 'Windows'
-        run: ./build.libgit2.ps1 ${{ matrix.param }}
-      - name: Build macOS
-        if: runner.os == 'macOS'
-        run: ./build.libgit2.sh
       - name: Setup QEMU
-        if: runner.os == 'Linux' && (matrix.rid == 'linux-arm' || matrix.rid == 'linux-arm64' || matrix.rid == 'linux-ppc64le' || matrix.rid == 'linux-musl-arm' || matrix.rid == 'linux-musl-arm64')
+        if: matrix.rid == 'linux-arm' || matrix.rid == 'linux-arm64' || matrix.rid == 'linux-ppc64le' || matrix.rid == 'linux-musl-arm' || matrix.rid == 'linux-musl-arm64'
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
-        if: runner.os == 'Linux'
         uses: docker/setup-buildx-action@v4
       - name: Build Linux
-        if: runner.os == 'Linux'
         run: ./dockerbuild.sh
       - name: Verify build output
         shell: bash
@@ -102,9 +146,81 @@ jobs:
         with:
           name: ${{ matrix.name }}
           path: nuget.package/runtimes/${{ matrix.rid }}
+  smoke-windows:
+    name: smoke-win-x64
+    needs: build-windows
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+      - name: Download win-x64 artifact
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: win-x64
+          path: smoke-test/windows
+      - name: Compute libgit2 DLL name
+        id: dll
+        shell: bash
+        run: |
+          SHA=$(cat nuget.package/libgit2/libgit2_hash.txt)
+          echo "name=git2-${SHA:0:7}.dll" >> "$GITHUB_OUTPUT"
+      - name: Build static-CRT loader
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          cl /MT /O2 smoke-test\windows\loader.c /Fe:smoke-test\windows\loader.exe
+      - name: Build bare-Windows smoke image
+        run: docker build -t libgit2-smoke -f smoke-test/windows/Dockerfile smoke-test/windows
+      - name: Load git2 on bare Windows (no VC++ redist)
+        run: docker run --rm libgit2-smoke C:\native\${{ steps.dll.outputs.name }}
+  smoke-linux:
+    name: smoke-${{ matrix.name }}
+    needs: build-linux
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64-openssl3
+            artifact: linux-x64
+            build_base: debian:bookworm
+            runtime_base: debian:bookworm-slim
+            runtime_pkgs: libssl3
+            suffix: ""
+          - name: linux-x64-openssl1.1
+            artifact: linux-x64-openssl1.1
+            build_base: debian:bullseye
+            runtime_base: debian:bullseye-slim
+            runtime_pkgs: libssl1.1
+            suffix: "-openssl1.1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+      - name: Download artifact
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: smoke-test/linux
+      - name: Compute libgit2 .so name
+        id: so
+        run: |
+          SHA=$(cat nuget.package/libgit2/libgit2_hash.txt)
+          echo "name=libgit2-${SHA:0:7}${{ matrix.suffix }}.so" >> "$GITHUB_OUTPUT"
+      - name: Build smoke image
+        run: |
+          docker build -t libgit2-smoke \
+            --build-arg BUILD_BASE=${{ matrix.build_base }} \
+            --build-arg RUNTIME_BASE=${{ matrix.runtime_base }} \
+            --build-arg RUNTIME_PKGS=${{ matrix.runtime_pkgs }} \
+            -f smoke-test/linux/Dockerfile smoke-test/linux
+      - name: Load libgit2 in slim runtime
+        run: docker run --rm -e LD_LIBRARY_PATH=/native libgit2-smoke /native/${{ steps.so.outputs.name }}
   package:
     name: Create package
-    needs: build
+    needs:
+      - build-windows
+      - build-mac
+      - build-linux
     runs-on: ubuntu-24.04
     env:
       DOTNET_NOLOGO: true
@@ -168,12 +284,12 @@ jobs:
         run: dotnet nuget push ./nuget.package/*.nupkg --api-key "$FEED_API_KEY" --source "$FEED_SOURCE"
   ci:
     name: ci
-    needs: [build, package]
+    needs: [package, smoke-windows, smoke-linux]
     runs-on: ubuntu-24.04
     steps:
       - name: Check results
         run: |
-          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.package.result }}" != "success" ]; then
+          if [ "${{ needs.package.result }}" != "success" ] || [ "${{ needs.smoke-windows.result }}" != "success" ] || [ "${{ needs.smoke-linux.result }}" != "success" ]; then
             echo "One or more jobs failed"
             exit 1
           fi

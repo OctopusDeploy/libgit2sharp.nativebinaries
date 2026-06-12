@@ -3,7 +3,9 @@ FROM alpine:3.19
 RUN apk add --no-cache bash build-base cmake curl openssl-dev
 
 ARG LIBSSH2_VERSION=1.11.1
+ARG LIBSSH2_SHA256=d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7
 RUN curl -fsSL https://github.com/libssh2/libssh2/releases/download/libssh2-${LIBSSH2_VERSION}/libssh2-${LIBSSH2_VERSION}.tar.gz -o libssh2.tar.gz \
+ && echo "${LIBSSH2_SHA256}  libssh2.tar.gz" | sha256sum -c - \
  && tar xf libssh2.tar.gz \
  && cmake -S libssh2-${LIBSSH2_VERSION} -B libssh2-${LIBSSH2_VERSION}/build \
     -DCMAKE_BUILD_TYPE=Release \

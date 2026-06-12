@@ -10,6 +10,7 @@ PACKAGEPATH="nuget.package/runtimes"
 OSXARCHITECTURE=$ARCH
 
 EXTRA_CMAKE_FLAGS=""
+CMAKE_PREFIX_PATH_FLAG=""
 
 # When OPENSSL_VARIANT is set, append it to the libgit2 filename so multiple
 # variants can ship side by side and be selected at runtime
@@ -28,9 +29,11 @@ if [[ $OS == "Darwin" ]]; then
     fi
 
     LIBSSH2_VERSION="${LIBSSH2_VERSION:-1.11.1}"
+    LIBSSH2_SHA256="${LIBSSH2_SHA256:-d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7}"
     LIBSSH2_PREFIX="$(pwd)/libssh2-install"
     rm -rf "$LIBSSH2_PREFIX" libssh2-src libssh2.tar.gz
     curl -fsSL "https://github.com/libssh2/libssh2/releases/download/libssh2-${LIBSSH2_VERSION}/libssh2-${LIBSSH2_VERSION}.tar.gz" -o libssh2.tar.gz
+    echo "${LIBSSH2_SHA256}  libssh2.tar.gz" | shasum -a 256 -c -
     mkdir libssh2-src
     tar xf libssh2.tar.gz -C libssh2-src --strip-components=1
     cmake -S libssh2-src -B libssh2-src/build \
@@ -45,8 +48,8 @@ if [[ $OS == "Darwin" ]]; then
     cmake --build libssh2-src/build --target install
     rm -rf libssh2-src libssh2.tar.gz
 
-    # Make libgit2's configure discover our build instead of the Homebrew copy.
-    EXTRA_CMAKE_FLAGS="-DCMAKE_PREFIX_PATH=$LIBSSH2_PREFIX"
+    # CMAKE_PREFIX_PATH is passed directly to cmake below to avoid word-splitting on spaces in the path.
+    CMAKE_PREFIX_PATH_FLAG="-DCMAKE_PREFIX_PATH=$LIBSSH2_PREFIX"
 else
     USEHTTPS="OpenSSL-Dynamic"
     EXTRA_CMAKE_FLAGS="-DCMAKE_BUILD_RPATH='\$ORIGIN'"
@@ -65,6 +68,7 @@ cmake -DCMAKE_BUILD_TYPE:STRING=Release \
       -DCMAKE_OSX_ARCHITECTURES=$OSXARCHITECTURE \
       -DUSE_HTTPS=$USEHTTPS \
       -DUSE_BUNDLED_ZLIB=ON \
+      ${CMAKE_PREFIX_PATH_FLAG:+"$CMAKE_PREFIX_PATH_FLAG"} \
       $EXTRA_CMAKE_FLAGS \
       ..
 cmake --build .

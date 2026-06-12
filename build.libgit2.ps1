@@ -38,6 +38,10 @@ if ($test.IsPresent) { $build_tests = 'ON' }
 $configuration = "Release"
 if ($debug.IsPresent) { $configuration = "Debug" }
 
+$libssh2Version = if ($Env:LIBSSH2_VERSION) { $Env:LIBSSH2_VERSION } else { "1.11.1" }
+$libssh2VcpkgBaseline = "2979dbff1b38167a2a0d2b47b7c549c61273eabf"
+$libssh2VcpkgPortVersion = 3
+
 function Run-Command([scriptblock]$Command, [switch]$Fatal, [switch]$Quiet) {
     $output = ""
     if ($Quiet) {
@@ -128,17 +132,30 @@ function Install-Libssh2($arch) {
     # to override it — classic mode has no --no-default-features flag.
     # The overlay triplet injects -DENABLE_ECDSA_WINCNG=ON into every package's
     # cmake configure step (zlib ignores it; libssh2 uses it).
+    #
+    # builtin-baseline pins the vcpkg registry to a specific commit so libssh2 (and
+    # its transitive zlib) resolve to fixed versions regardless of the runner image's
+    # vcpkg checkout. The override asserts the libssh2 version (from ci.yml) at that
+    # baseline's port-version.
     $manifestDir = Join-Path $projectDirectory "libssh2-wincng-manifest"
     New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
     @"
 {
   "name": "libssh2-wincng",
   "version": "1.0.0",
+  "builtin-baseline": "$libssh2VcpkgBaseline",
   "dependencies": [
     {
       "name": "libssh2",
       "default-features": false,
       "features": ["zlib"]
+    }
+  ],
+  "overrides": [
+    {
+      "name": "libssh2",
+      "version": "$libssh2Version",
+      "port-version": $libssh2VcpkgPortVersion
     }
   ]
 }

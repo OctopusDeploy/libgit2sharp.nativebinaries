@@ -2,10 +2,11 @@ OpenSSL is licensed under the Apache License 2.0.
 
 Copyright (c) 1998-2025 The OpenSSL Project Authors. All Rights Reserved.
 
-OpenSSL (libcrypto) is bundled in the macOS runtimes of this package only, where
-it provides libssh2's crypto backend. It is not redistributed on Linux (the
-system OpenSSL is loaded at runtime) or on Windows (libssh2 uses the Windows CNG
-backend). The text below is OpenSSL's LICENSE.txt.
+OpenSSL (libcrypto) is bundled as a separate dynamic library (libcrypto.3.dylib)
+in the macOS runtimes of this package only, where it provides libssh2's crypto
+backend. It is not redistributed on Linux (the system OpenSSL is loaded at
+runtime) or on Windows (libssh2 uses the Windows CNG backend). The text below is
+OpenSSL's LICENSE.txt.
 
 ----------------------------------------------------------------------
 

@@ -1,9 +1,9 @@
 libssh2 is licensed under the BSD-3-Clause license. The text below is the
 COPYING file from the libssh2 1.11.1 release.
 
-libssh2 is bundled in every runtime of this package (win-*, linux-*, osx-*); in
-the Linux *-openssl1.1 variants it is statically linked into libgit2 rather than
-shipped as a separate library.
+libssh2 is statically linked into libgit2 on Windows and Linux (win-*, linux-*).
+On macOS it ships as a separate dynamic library (libssh2.1.dylib) alongside
+libgit2.
 
 ----------------------------------------------------------------------
 

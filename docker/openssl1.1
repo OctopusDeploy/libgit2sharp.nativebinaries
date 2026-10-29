@@ -1,5 +1,9 @@
 FROM debian:bullseye-slim
 
+# Bullseye is past end of life. deb.debian.org still serves its indexes but has
+# purged the security pool, so packages come from the archive.
+RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \

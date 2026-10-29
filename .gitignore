@@ -10,3 +10,6 @@ obj/
 .vs/
 libssh2-wincng-manifest/
 libssh2-wincng-installed/
+libssh2-install/
+libssh2-src/
+nuget.package/runtimes/

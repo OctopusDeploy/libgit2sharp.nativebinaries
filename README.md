@@ -120,6 +120,34 @@ git push origin 2.0.312-octopus.1
 This triggers CI, which builds all native binaries, packs the NuGet package with the tag as its version, and pushes it to the configured feed.
 
 
+## Bundled third-party libraries
+
+libgit2 is built with SSH support through libssh2. Where libssh2 and OpenSSL end up depends on the platform.
+
+| Platform | libssh2 | OpenSSL |
+|---|---|---|
+| Windows | Built by vcpkg with the WinCNG backend and statically linked into libgit2 | Not used, crypto comes from Windows CNG |
+| Linux (glibc, musl and the `openssl1.1` variant) | Built from source in `docker/linux`, `docker/musl` and `docker/openssl1.1` and statically linked into libgit2 | Not bundled, the system OpenSSL is loaded at runtime |
+| macOS | Built from source by `build.libgit2.sh` and bundled as `libssh2.1.dylib` | Bundled as `libcrypto.3.dylib` from Homebrew `openssl@3` |
+
+The package ships a license text for each library under `nuget.package/libgit2/`.
+
+- `libgit2.license.txt` is copied from the `COPYING` file of the libgit2 submodule by `UpdateLibgit2ToSha.ps1`.
+- `libssh2.license.txt` and `openssl.license.txt` are maintained by hand from the `COPYING` file of the libssh2 release and the `LICENSE.txt` of the OpenSSL release.
+
+### Updating libssh2
+
+The version and checksum are repeated across several files, so a bump touches all of these.
+
+1. Set `LIBSSH2_VERSION` and `LIBSSH2_SHA256` in the workflow-level `env:` in `.github/workflows/ci.yml`.
+2. Update the same two defaults in `build.libgit2.sh`, `dockerbuild.sh`, and the `ARG` lines of `docker/linux`, `docker/musl` and `docker/openssl1.1`.
+3. Update the version default in `build.libgit2.ps1` and `verify-build.sh`, which have no checksum.
+4. In `build.libgit2.ps1`, move `$libssh2VcpkgBaseline` to a vcpkg commit that carries the new libssh2 version and set `$libssh2VcpkgPortVersion` to that port's `port-version`. These three values must agree or the Windows build fails.
+5. In `nuget.package/libgit2/libssh2.license.txt`, replace the text below the preamble with the `COPYING` file of the new release and update the version named in the preamble.
+
+`LIBSSH2_SHA256` is the SHA256 of the GitHub release asset `libssh2-<version>.tar.gz`, which is the file every build downloads.
+
+
 ## Notes on Visual Studio
 
 Visual Studio 2019 is required to build the Windows native binaries, however you

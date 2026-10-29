@@ -7,6 +7,11 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+-*"
   pull_request:
   workflow_dispatch:
+env:
+  LIBSSH2_VERSION: "1.11.1"
+  # Hash is of the GitHub release asset libssh2-<LIBSSH2_VERSION>.tar.gz that the
+  # build scripts download. It is the same file as https://libssh2.org/download/.
+  LIBSSH2_SHA256: "d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7"
 jobs:
   build-windows:
     name: ${{ matrix.name }}
